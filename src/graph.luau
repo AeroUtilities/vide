@@ -7,7 +7,7 @@ export type SourceNode<T> = {
 
 export type Node<T> =  {
     cache: T,
-    effect:  ((T) -> T) | false,
+    effect:  ((T) -> T) | (() -> T) | false,
     cleanups: { () -> () } | false,
 
     context: { [number]: unknown } | false,
@@ -101,7 +101,10 @@ end
 local function flush_cleanups<T>(node: Node<T>)
     if node.cleanups then
         for _, fn in node.cleanups do
-            local ok, err: string? = xpcall(fn, debug.traceback)
+            local err: string?
+            local ok = xpcall(fn, function(e)
+                err = debug.traceback(tostring(e), 2)
+            end)
             if not ok then error(`cleanup error: {err}`, 0) end
         end
 
@@ -263,7 +266,7 @@ local function push_scope_as_child_of<T>(node: SourceNode<T>)
     end
 end
 
-local function create_node<T>(owner: false | Node<any>, effect: false | (T) -> T, value: T): Node<T>
+local function create_node<T>(owner: false | Node<any>, effect: false | ((T) -> T) | (() -> T), value: T): Node<T>
     local node: Node<T> = {
         cache = value,
         effect = effect,

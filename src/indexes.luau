@@ -17,10 +17,10 @@ local function indexes<K, V, Obj>(
         destroy: () -> (),
         object: Obj,
         value: V?,
-        value_source: (V?) -> V,
+        value_source: source.Source<V>,
         count: number,
         delay: number,
-        present: (boolean?) -> boolean,
+        present: source.Source<boolean>,
         timeout: { cancel: boolean }?,
     }>
 

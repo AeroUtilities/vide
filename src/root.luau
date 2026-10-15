@@ -5,6 +5,8 @@ local push_scope = graph.push_scope
 local pop_scope = graph.pop_scope
 local destroy = graph.destroy
 
+type Root = <T...>(fn: (destroy: () -> ()) -> T...) -> (() -> (), T...)
+
 local refs = {}
 
 local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
@@ -20,7 +22,7 @@ local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
 
     push_scope(node)
 
-    local result = { xpcall(fn, debug.traceback, destroy) }
+    local result = { xpcall(fn, function(err) return debug.traceback(err, 2) end, destroy) }
 
     pop_scope()
 
@@ -32,4 +34,4 @@ local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
     return destroy, unpack(result :: any, 2)
 end
 
-return root :: <T...>(fn: (destroy: () -> ()) -> T...) -> (() -> (), T...)
+return root :: Root

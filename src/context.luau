@@ -55,7 +55,7 @@ local function context<T>(...: T): Context<T>
 
             push_scope(new_scope)
 
-            local function efn(err: string) return debug.traceback(err, 3) end
+            local function efn(e): string return debug.traceback(tostring(e), 3) end
             local ok, result = xpcall(component, efn)
 
             pop_scope()
@@ -66,8 +66,6 @@ local function context<T>(...: T): Context<T>
 
             return result
         end
-
-        return nil :: any
     end
 end
 

@@ -6,6 +6,14 @@ local get_scope = graph.get_scope
 local evaluate_node = graph.evaluate_node
 local push_cleanup = graph.push_cleanup
 
+type Children = Instance | { Children } | (() -> Children)
+type ChildrenCache = {
+    instance: Instance,
+    cur_children_set: { [Instance]: true },
+    new_children_set: { [Instance]: true },
+    source: () -> Children,
+}
+
 local function update_property_effect(p: {
     instance: Instance,
     property: string,
@@ -24,19 +32,15 @@ local function update_parent_effect(p: {
 end
 
 -- todo: investigate if "count" method used in indexes() and values() can improve performance here
-local function update_children_effect(p: {
-    instance: Instance,
-    cur_children_set: { [Instance]: true },
-    new_children_set: { [Instance]: true },
-    source: () -> Instance | { Instance }
-})
+local function update_children_effect(p: ChildrenCache): ChildrenCache
     local cur_children_set: { [Instance]: true } = p.cur_children_set -- cache of all children parented before update
     local new_children_set: { [Instance]: true } = p.new_children_set -- cache of all children parented after update
 
     local new_children = p.source() -- all (and only) children that should be parented after this update
     
-    local function process_child(child: Instance | { Instance })
+    local function process_child(child: Children)
         if type(child) == "userdata" then
+            child = child :: Instance
             if new_children_set[child] then return end -- stops redundant reparenting
 
             new_children_set[child] = true -- record child set from this update
@@ -47,16 +51,18 @@ local function update_children_effect(p: {
                 cur_children_set[child] = nil -- remove child from cache if it was already in cache
             end  
         elseif type(child) == "table" then
-            for _, child in child do
-                process_child(child)
+            for _, sub in child do
+                process_child(sub)
             end
         elseif type(child) == "function" then
-            local node = create_node(assert(get_scope()), update_children_effect, {
+            local cache: ChildrenCache = {
                 instance = p.instance,
                 cur_children_set = {},
                 new_children_set = {},
-                source = child   
-            })
+                source = child,
+            }
+
+            local node = create_node(assert(get_scope()), update_children_effect, cache)
     
             evaluate_node(node)
 
@@ -104,13 +110,15 @@ return {
         return node
     end,
 
-    children = function(instance, children)
-        local node = create_node(assert_stable_scope(), update_children_effect, {
+    children = function(instance: Instance, children: () -> Children)
+        local cache: ChildrenCache = {
             instance = instance,
             cur_children_set = {},
             new_children_set = {},
-            source = children
-        })
+            source = children,
+        }
+
+        local node = create_node(assert_stable_scope(), update_children_effect, cache)
 
         evaluate_node(node)
 

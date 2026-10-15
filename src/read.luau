@@ -1,5 +1,8 @@
 local function read<T>(value: T | () -> T): T
-    return if type(value) == "function" then value() else value
+    if type(value) == "function" then
+        return (value :: () -> T)()
+    end
+    return value :: T
 end
 
 return read

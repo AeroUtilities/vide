@@ -8,17 +8,19 @@ type Map<K, V> = { [K]: V }
 type Source<T> = () -> T
 type Component<T> = (Source<boolean>) -> (T, ...number)
 
+type Scope<Obj> = {
+    destroy: () -> (),
+    object: Obj,
+    delay: number,
+    present: (boolean?) -> boolean,
+    timeout: { cancel: boolean }?
+}
+
 local function switch_map<K, Obj>(
     input: Source<K>,
     map: Map<K, Component<Obj>>
 ): Source<nil | Obj | Array<Obj>>
-    local scopes = {} :: Map<K, {
-        destroy: () -> (),
-        object: Obj,
-        delay: number,
-        present: (boolean?) -> boolean,
-        timeout: { cancel: boolean }?
-    }>
+    local scopes = {} :: Map<K, Scope<Obj>>
 
     local output = source(nil :: nil | Obj | Array<Obj>)
     local function update_output()
@@ -94,7 +96,7 @@ local function switch_map<K, Obj>(
                         delay = delay or 0,
                         present = present,
                         timeout = nil
-                    }
+                    } :: Scope<Obj>
                 end
             end
         end

@@ -1,4 +1,4 @@
-local typeof = Instance and typeof or require "../test/mock".typeof :: never
+local typeof = if Instance then typeof else require "../test/mock".typeof :: never
 
 local graph = require "./graph"
 local get_scope = graph.get_scope
@@ -9,10 +9,10 @@ local function helper(obj: any)
         if typeof(obj) == "RBXScriptConnection" then function() obj:Disconnect() end
         elseif type(obj) == "thread" then function() task.cancel(obj) end
         elseif typeof(obj) == "Instance" then function() obj:Destroy() end
-        elseif obj.destroy then function() obj:destroy() end
-        elseif obj.disconnect then function() obj:disconnect() end
-        elseif obj.Destroy then function() obj:Destroy() end
-        elseif obj.Disconnect then function() obj:Disconnect() end
+        elseif typeof(obj.destroy) == "function" then function() obj:destroy() end
+        elseif typeof(obj.disconnect) == "function" then function() obj:disconnect() end
+        elseif typeof(obj.Destroy) == "function" then function() obj:Destroy() end
+        elseif typeof(obj.Disconnect) == "function" then function() obj:Disconnect() end
         else error "cannot cleanup given object"
 end
 

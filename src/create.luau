@@ -1,5 +1,5 @@
-local typeof = Instance and typeof or require "../test/mock".typeof :: never
-local Instance = Instance or require "../test/mock".Instance :: never
+local typeof = if Instance then typeof else require "../test/mock".typeof :: never
+local Instance = if Instance then Instance else require "../test/mock".Instance :: never
 
 local defaults = require "./defaults"
 local apply = require "./apply"

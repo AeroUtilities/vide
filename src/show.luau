@@ -6,11 +6,12 @@ local switch = require "./switch"
 
 type Array<T> = { T }
 type Source<T> = () -> T
+type Component<T> = (Source<boolean>) -> (T, ...number)
 
 local function show<T, Obj>(
     input: Source<T?>,
     component: (Source<T>, Source<boolean>) -> (Obj, ...number),
-    fallback: ((Source<boolean>) -> (Obj, ...number))?
+    fallback: Component<Obj>?
 ): Source<nil | Obj | Array<Obj>>
     local filtered_input = source()
 
@@ -29,7 +30,7 @@ local function show<T, Obj>(
         [true] = function(present)
             return component(filtered_input, present)
         end,
-        [false] = fallback
+        [false] = fallback :: Component<Obj>,
     }
 end
 

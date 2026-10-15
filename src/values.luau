@@ -17,10 +17,10 @@ local function values<K, V, Obj>(
         destroy: () -> (),
         object: Obj,
         index: K?,
-        index_source: (K?) -> K,
+        index_source: source.Source<K>,
         count: number,
         delay: number,
-        present: (boolean?) -> boolean,
+        present: source.Source<boolean>,
         timeout: { cancel: boolean }?,
     }>
 

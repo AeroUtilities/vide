@@ -3,14 +3,17 @@ local graph = require "./graph"
 
 local function batch(setter: () -> ())
     local already_batching = flags.batch
-    local from
+    local from: number
 
     if not already_batching then
         flags.batch = true
         from = graph.get_update_queue_length()
     end
 
-    local ok, err: string? = xpcall(setter, debug.traceback)
+    local err: string?
+    local ok = xpcall(setter, function(e)
+        err = debug.traceback(tostring(e), 2)
+    end)
 
     if not already_batching then
         flags.batch = false

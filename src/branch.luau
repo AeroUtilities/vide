@@ -25,7 +25,9 @@ local function branch<T>(fn: () -> T): (() -> (), T)
 
     push_scope(node)
 
-    local ok, result = xpcall(fn, debug.traceback)
+    local ok, result = xpcall(fn, function(e): string
+        return debug.traceback(tostring(e), 2)
+    end)
 
     pop_scope()
 
