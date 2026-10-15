@@ -709,6 +709,26 @@ TEST("cleanup()", wrap_root(function()
         CHECK(ran.destroy)
         CHECK(ran.Destroy)
     end
+
+    do CASE "cleanup objects with non-function fields"
+        local ran = false
+
+        root(function(destroy)
+            cleanup({ destroy = true, Destroy = function() ran = true end } :: any)
+            destroy()
+        end)
+
+        CHECK(ran)
+
+        local ok, err = pcall(function()
+            root(function()
+                cleanup({ destroy = true } :: any)
+            end)
+        end)
+
+        CHECK(not ok)
+        CHECK(string.find(tostring(err), "cannot cleanup given object", 1, true))
+    end
 end))
 
 TEST("create()", wrap_root(function()
@@ -2953,6 +2973,77 @@ TEST("graph edge cases", wrap_root(function()
         CHECK(true)
     end
 end))
+
+TEST("non-string errors", function()
+    local function check_table_error(fn: () -> ())
+        local ok, err = pcall(fn)
+        local message = tostring(err)
+
+        CHECK(not ok)
+        CHECK(string.find(message, "table:", 1, true))
+        CHECK(not string.find(message, "error in error handling", 1, true))
+    end
+
+    do CASE "root()"
+        check_table_error(function()
+            root(function() error({}) end)
+        end)
+    end
+
+    do CASE "batch()"
+        check_table_error(function()
+            batch(function() error({}) end)
+        end)
+    end
+
+    do CASE "untrack()"
+        root(function(destroy)
+            check_table_error(function()
+                untrack(function() error({}) end)
+            end)
+            destroy()
+        end)
+    end
+
+    do CASE "branch()"
+        root(function(destroy)
+            check_table_error(function()
+                show(source(true), function() error({}) end)
+            end)
+            destroy()
+        end)
+    end
+end)
+
+TEST("vide members", function()
+    do CASE "read invalid member"
+        local ok, err = pcall(function()
+            return (vide :: any).not_a_member
+        end)
+
+        CHECK(not ok)
+        CHECK(err == "not_a_member is not a valid member of vide")
+    end
+
+    do CASE "write invalid member"
+        local ok, err = pcall(function()
+            (vide :: any).not_a_member = true
+        end)
+
+        CHECK(not ok)
+        CHECK(err == "not_a_member is not a valid member of vide")
+    end
+
+    do CASE "read and write flag"
+        local before = vide.defaults
+
+        vide.defaults = not before
+        CHECK(vide.defaults == not before)
+
+        vide.defaults = before
+        CHECK(vide.defaults == before)
+    end
+end)
 
 TEST("strict", wrap_root(function()
     vide.strict = true
