@@ -12,7 +12,7 @@ type Scope<Obj> = {
     destroy: () -> (),
     object: Obj,
     delay: number,
-    present: (boolean?) -> boolean,
+    present: source.Source<boolean>,
     timeout: { cancel: boolean }?
 }
 

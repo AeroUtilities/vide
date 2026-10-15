@@ -22,7 +22,7 @@ local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
 
     push_scope(node)
 
-    local result = { xpcall(fn, function(err) return debug.traceback(err, 2) end, destroy) }
+    local result = { xpcall(fn, function(e) return debug.traceback(tostring(e), 2) end, destroy) }
 
     pop_scope()
 
