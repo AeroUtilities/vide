@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 --------------------------------------------------------------------------------
 
+## [Unreleased]
+
+### Changed
+
+- Errors that are not strings, such as `error({})`, are now reported with a
+  stack trace instead of `error in error handling` when thrown inside `root()`,
+  `batch()`, `untrack()`, cleanup callbacks, and components of `show()`,
+  `switch()`, `indexes()` and `values()`.
+- `cleanup()` now only treats an object as destroyable or disconnectable when
+  its `destroy`, `disconnect`, `Destroy` or `Disconnect` field is a function.
+
+### Fixed
+
+- Type errors in the library source under the new type solver.
+- Error message when setting an invalid member of `vide` no longer ends with
+  `, 0`.
+
+--------------------------------------------------------------------------------
+
 ## [0.4.1] - 2026-07-11
 
 ### Changed
