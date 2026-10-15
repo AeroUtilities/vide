@@ -1,4 +1,9 @@
-type Flags = { [string]: boolean }
+type Flags = {
+    strict: boolean,
+    defaults: boolean,
+    defer_nested_properties: boolean,
+    batch: boolean,
+}
 
 local function inline_test(): string
     return debug.info(1, "n")

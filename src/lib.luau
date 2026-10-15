@@ -95,26 +95,28 @@ local vide = {
     step = function(dt: number)
         if stepped then
             stepped:Disconnect()
-            stepped = nil
+            stepped = nil :: any
         end
         step(dt)
     end
 }
 
 setmetatable(vide :: any, {
-    __index = function(_, index: unknown): ()
-        if flags[index] == nil then
-            error(`{tostring(index)} is not a valid member of vide`, 0)
+    __index = function(_, key: string): boolean
+        local flags = flags :: any
+        if flags[key] == nil then
+            error(`{key} is not a valid member of vide`, 0)
         else
-            return flags[index]
+            return flags[key]
         end
     end,
 
-    __newindex = function(_, index: unknown, value: unknown)
-        if flags[index] == nil then
-            error(`{tostring(index)} is not a valid member of vide, 0`)
+    __newindex = function(_, key: string, value: boolean): ()
+        local flags = flags :: any
+        if flags[key] == nil then
+            error(`{key} is not a valid member of vide`, 0)
         else
-            flags[index] = value
+            flags[key] = value
         end
     end
 })
