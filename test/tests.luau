@@ -1,3 +1,4 @@
+--!nolint DeprecatedApi
 local testkit = require "./testkit"
 local TEST, CASE, CHECK, FINISH = testkit.test()
 
@@ -33,6 +34,7 @@ type Map<K, V> = { [K] : V }
 
 local function gc(n: number?)
     for i = 1, n or 3 do
+
         (collectgarbage :: any)("collect")
     end
 end

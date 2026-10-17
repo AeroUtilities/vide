@@ -1,78 +1,84 @@
+--[[
+    Finite spring integration test (replaces the old infinite ANSI bar demo).
+    The previous version looped forever and relied on "\27[H\27[2J", which most
+    IDE terminals do not honor as a full clear.
+]]
+
+local testkit = require "./testkit"
+local TEST, CASE, CHECK, FINISH = testkit.test()
+
 local vide = require "../../vide"
+local root = vide.root
+local source = vide.source
+local spring = vide.spring
+local step = vide.step
 
-local function system(): (number) -> number
-    local MAX = 40
-    local MIN = 10
+local MAX = 40
+local MIN = 10
+local PERIOD = 1
+local DAMPING = 0.3
+local DT = 1 / 30
 
-    local _, input, output = vide.root(function()
-        local input = vide.source(MAX)
-        local output = vide.spring(input, 1, .3)
-        return input, output
-    end)
+TEST("spring visual replacement", function()
+    do CASE "moves toward toggled targets and settles"
+        local destroy, input, output = root(function()
+            local input = source(MAX)
+            local output = spring(input, PERIOD, DAMPING)
+            return input, output
+        end)
 
-    local T = 10
-    local t = 0
-    return function(dt)
-        t += dt
-        if t >= T then
-            t -= T
-            input(input() == MAX and MIN or MAX)
+        CHECK(output() == MAX)
+
+        -- drive toward MIN for a few seconds of simulated time
+        input(MIN)
+        local previous = output()
+        local moved = false
+
+        for _ = 1, 30 do -- ~1s at 30fps
+            step(DT)
+            local current = output()
+            if current ~= previous then
+                moved = true
+            end
+            if current < previous then
+                -- springing down toward MIN
+                previous = current
+            else
+                previous = current
+            end
         end
 
-        vide.step(dt)
+        CHECK(moved)
+        CHECK(output() < MAX)
+        CHECK(output() > MIN - 1) -- still above / near the lower target while settling
 
-        return output()
-    end
-end
+        -- finish the motion
+        step(10)
+        CHECK(math.abs(output() - MIN) < 0.01)
 
---------------------------------------------------------------------------------
+        -- toggle back up and settle at MAX
+        input(MAX)
+        step(10)
+        CHECK(math.abs(output() - MAX) < 0.01)
 
-local function redraw_block(h: number)
-    local OFFSET = 70
-
-    local BLOCK = "█"
-
-    local function remainder_to_block(x)
-        return
-            if x > 7/8 then "█"
-            elseif x > 6/8 then "▇"
-            elseif x > 5/8 then "▆"
-            elseif x > 4/8 then "▅"
-            elseif x > 3/8 then "▄"
-            elseif x > 2/8 then "▃"
-            elseif x > 1/8 then "▂"
-            else "▁"
+        destroy()
     end
 
-    local h_f = math.floor(h)
-    local reset = "\27[H\27[2J" -- ANSI clear terminal
-    local offset = string.rep("\n", OFFSET - h_f)
-    local bar = remainder_to_block(h - h_f) .. "\n" .. string.rep(BLOCK .. "\n", h_f)
-    --print(reset .. offset .. bar .. "\n" .. string.format("%.1f", h))
-    print(reset .. offset .. bar .. "\n" .. h)
-end
+    do CASE "config impulse changes output on next spring step"
+        local destroy, input, output, control = root(function()
+            local input = source(20)
+            local output, control = spring(input, PERIOD, DAMPING)
+            return input, output, control
+        end)
 
-local program_time = os.clock()
+        CHECK(output() == 20)
 
-local function step(): number
-    local FPS = 30
-    local DT = 1/FPS
+        control { impulse = 5 }
+        step(DT)
+        CHECK(output() ~= 20)
 
-    repeat until os.clock() - program_time >= DT
-    program_time += DT
-    return DT
-end
-
-local function loop()
-    local callback = system()
-
-    while true do
-        local dt = step()
-        local x = callback(dt)
-        redraw_block(x)
+        destroy()
     end
-end
+end)
 
-loop()
-
-
+FINISH()
