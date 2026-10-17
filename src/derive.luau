@@ -1,8 +1,17 @@
+--* [[----------< modules >----------]]
+
 local graph = require "./graph"
+
+
+--* [[----------< graph >----------]]
+
 local create_node = graph.create_node
 local push_scope_as_child_of = graph.push_scope_as_child_of
 local assert_stable_scope = graph.assert_stable_scope
 local evaluate_node = graph.evaluate_node
+
+
+--* [[----------< derive >----------]]
 
 local function derive<T>(source: () -> T): () -> T
     local node = create_node(assert_stable_scope(), source, false :: any)

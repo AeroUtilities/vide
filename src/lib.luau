@@ -1,7 +1,12 @@
-local version = { major = 0, minor = 4, patch = 1 }
+--* [[----------< constants >----------]]
+
+local VERSION = { major = 0, minor = 4, patch = 1 }
+local NIL = (nil :: any)
+
+
+--* [[----------< modules >----------]]
 
 local root = require "./root"
-local branch = require "./branch"
 local mount = require "./mount"
 local create = require "./create"
 local apply = require "./apply"
@@ -20,8 +25,11 @@ local values = require "./values"
 local spring, update_springs = require "./spring"()
 local action = require "./action"()
 local changed = require "./changed"
-local timeout, update_timeouts = require "./timeout"()
+local _, update_timeouts = require "./timeout"()
 local flags = require "./flags"
+
+
+--* [[----------< types >----------]]
 
 export type Source<T> = source.Source<T>
 export type source<T> = Source<T>
@@ -30,30 +38,47 @@ export type context<T> = Context<T>
 export type Instances = create.Instances
 export type Properties<T> = create.Properties<T>
 
+
+--* [[----------< runtime >----------]]
+
 local function step(dt: number)
-    if debug.profilebegin then debug.profilebegin("VIDE STEP") end
+    if debug.profilebegin then 
+        debug.profilebegin("Vide: step") 
+    end
 
-    if debug.profilebegin then debug.profilebegin("VIDE SPRING") end
+    if debug.profilebegin then 
+        debug.profilebegin("Vide: spring") 
+    end
     update_springs(dt)
-    if debug.profileend then debug.profileend() end
+    if debug.profileend then 
+        debug.profileend() 
+    end
 
-    if debug.profilebegin then debug.profilebegin("VIDE SCHEDULER") end
+    if debug.profilebegin then 
+        debug.profilebegin("Vide: scheduler") 
+    end
     update_timeouts(dt)
-    if debug.profileend then debug.profileend() end
+    if debug.profileend then 
+        debug.profileend() 
+    end
 
-    if debug.profileend then debug.profileend() end
+    if debug.profileend then 
+        debug.profileend() 
+    end
 end
 
 local stepped = game and game:GetService("RunService").Heartbeat:Connect(function(dt: number)
     task.defer(step, dt)
-end)
+end) :: RBXScriptConnection? -- cast to `RBXScriptConnection?` if game is available
+
+
+--* [[----------< vide >----------]]
 
 local vide = {
-    version = version,
+    version = VERSION,
 
     -- core
     root = root,
-    --branch = branch,
     mount = mount,
     create = create,
     source = source,
@@ -78,10 +103,10 @@ local vide = {
     action = action,
     changed = changed,
 
-    -- flags
-    strict = (nil :: any) :: boolean,
-    defaults = (nil :: any) :: boolean,
-    defer_nested_properties = (nil :: any) :: boolean,
+    -- flags (resolved through the metatable below)
+    strict = NIL :: boolean,
+    defaults = NIL :: boolean,
+    defer_nested_properties = NIL :: boolean,
 
     -- temporary
     apply = function(instance: Instance)
@@ -98,25 +123,24 @@ local vide = {
             stepped = nil
         end
         step(dt)
-    end
+    end,
 }
 
 setmetatable(vide :: any, {
-    __index = function(_, index: unknown): ()
-        if flags[index] == nil then
-            error(`{tostring(index)} is not a valid member of vide`, 0)
-        else
-            return flags[index]
+    __index = function(_, key: string): boolean
+        local flag = (flags :: any)[key]
+        if flag == nil then
+            error(`{key} is not a valid member of vide`, 0)
         end
+        return flag
     end,
 
-    __newindex = function(_, index: unknown, value: unknown)
-        if flags[index] == nil then
-            error(`{tostring(index)} is not a valid member of vide`, 0)
-        else
-            flags[index] = value
+    __newindex = function(_, key: string, value: boolean)
+        if (flags :: any)[key] == nil then
+            error(`{key} is not a valid member of vide`, 0)
         end
-    end
+        ;(flags :: any)[key] = value
+    end,
 })
 
 return vide

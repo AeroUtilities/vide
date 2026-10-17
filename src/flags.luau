@@ -1,6 +1,11 @@
+--* [[----------< helper functions >----------]]
+
 local function inline_test(): string
     return debug.info(1, "n")
 end
+
+
+--* [[----------< flags >----------]]
 
 local is_O2 = inline_test() ~= "inline_test"
 

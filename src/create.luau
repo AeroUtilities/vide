@@ -1,58 +1,22 @@
-local typeof = Instance and typeof or require "../test/mock".typeof :: never
-local Instance = Instance or require "../test/mock".Instance :: never
+--* [[----------< global guards >----------]]
+
+local typeof = if Instance then typeof else require "../test/mock".typeof :: never
+local Instance = if Instance then Instance else require "../test/mock".Instance :: never
+
+
+--* [[----------< modules >----------]]
 
 local defaults = require "./defaults"
 local apply = require "./apply"
 local flags = require "./flags"
 
-local function create_constructor_for_class(class: string): ({ [unknown]: unknown }) -> Instance
-    local function constructor(properties: { [unknown]: unknown }): Instance
-        local ok, instance: Instance = pcall(Instance.new, class :: any)
-        if not ok then error(`invalid class name {class}`, 0) end
 
-        if flags.defaults then
-            local default: { [string]: unknown }? = defaults[class]
-            if default then
-                for i, v in default do
-                    (instance :: any)[i] = v
-                end
-            end
-        end
-
-        return apply(instance, properties)
-    end
-
-    return constructor
-end
-
-local constructor_cache = {} :: { [string]: ({ [unknown]: unknown }) -> Instance }
-
--- todo: remove support for different overloads
-local function create(class_or_instance: string|Instance, properties: { [unknown]: unknown }?): unknown
-    if type(class_or_instance) ~= "string" and typeof(class_or_instance) ~= "Instance" then
-        error("bad argument #1, expected string or instance, got " .. typeof(class_or_instance), 0)
-    end
-
-    local constructor: ({ [unknown]: unknown }) -> Instance
-    if type(class_or_instance) == "string" then
-        constructor = constructor_cache[class_or_instance]
-        if not constructor then
-            constructor = create_constructor_for_class(class_or_instance)
-            constructor_cache[class_or_instance] = constructor
-        end
-    else
-        constructor = function(props)
-            local clone = assert(class_or_instance:Clone(), "attempt to clone a non-archivable instance")
-            return apply(clone, props)
-        end
-    end
-
-    return if properties
-        then constructor(properties)
-        else constructor
-end
+--* [[----------< types >----------]]
 
 export type Instances = {
+    -- world objects
+    Part: Part,
+
     -- containers
     Folder: Folder,
     Configuration: Configuration,
@@ -112,22 +76,42 @@ export type Instances = {
     CFrameValue: CFrameValue,
 }
 
+type PropertyTable = { [unknown]: unknown }
+type Constructor = (PropertyTable) -> Instance
+type Create = <Name>(Name|keyof<Instances>|"") -> (Properties<index<Instances, Name>>) -> index<Instances, Name>
+
+
+--* [[----------< type function >----------]]
+
+-- builds the table type accepted by a constructor for the given instance type
+-- plain quotes are used in here since type functions run in a restricted environment
 export type function Properties(instance: type?)
     local properties = types.newtable()
 
     while instance do
-        for i, v in instance:properties() do
-            local connector = v.read and v.read.tag == "table" and v.read:readproperty(types.singleton("Connect"))
+        for name, property in instance:properties() do
+            local connector = property.read 
+                and property.read.tag == "table" 
+                and property.read:readproperty(types.singleton("Connect"))
+            ;
+
             if connector then
                 local params = connector:parameters().head
-                if not params then continue end
+                if not params then 
+                    continue
+                end
+
                 local listener = params[2]
-                if not listener then continue end
-                properties:setproperty(i, types.optional(listener))
-            elseif v.write then
-                properties:setproperty(i, types.optional(types.unionof(
-                    v.write,
-                    types.newfunction({}, { head = { v.write } })
+                if not listener then 
+                    continue
+                end
+
+                properties:setproperty(name, types.optional(listener))
+            elseif property.write then
+                -- writable properties accept the value itself or a function that returns the value
+                properties:setproperty(name, types.optional(types.unionof(
+                    property.write,
+                    types.newfunction({}, { head = { property.write } })
                 )))
             end
         end
@@ -135,11 +119,94 @@ export type function Properties(instance: type?)
         instance = instance:readparent()
     end
 
+    -- number keys hold children, actions and nested property tables
     properties:setindexer(types.number, types.any)
 
     return properties
 end
 
-type Create = <Name>(Name|keyof<Instances>|"") -> (Properties<index<Instances, Name>>) -> index<Instances, Name>
+
+--* [[----------< state >----------]]
+
+-- constructors for class names are created once and reused
+local constructor_cache: { [string]: Constructor } = {}
+
+
+--* [[----------< helper functions >----------]]
+
+local function apply_defaults(instance: Instance, class: string)
+    if not flags.defaults then 
+        return 
+    end
+
+    local default = defaults[class]
+    if not default then
+        return
+    end
+
+    local target = instance :: any
+    for property, value in default do
+        target[property] = value
+    end
+end
+
+
+
+local function create_constructor_class(class: string): Constructor
+    return function(properties: PropertyTable): Instance
+        local ok, instance: Instance = pcall(Instance.new, class :: any)
+        if not ok then error(`invalid class name {class}`, 0) end
+
+        apply_defaults(instance, class)
+        return apply(instance, properties)
+    end
+end
+
+
+
+local function get_class_constructor(class: string): Constructor
+    local cached = constructor_cache[class]
+    if cached then 
+        return cached
+    end
+
+    local constructor = create_constructor_class(class)
+    constructor_cache[class] = constructor
+
+    return constructor
+end
+
+
+-- every call clones the template, so the template itself is never modified
+local function create_clone_constructor(template: Instance): Constructor
+    return function(properties)
+        local clone = assert(template:Clone(), `attempt to clone a non-archivable instance`)
+
+        return apply(clone, properties)
+    end
+end
+
+
+--* [[----------< create >----------]]
+
+-- todo: remove support for different overloads
+local function create(class_or_instance: string|Instance, properties: PropertyTable?): unknown
+    -- typeof() returns "Instance" (capital I) for instances; type() is enough for strings
+    if type(class_or_instance) ~= "string" and typeof(class_or_instance) ~= "Instance" then
+        error(`bad argument #1, expected string or instance, got {typeof(class_or_instance)}`, 0)
+    end
+
+    local constructor = if type(class_or_instance) == "string"
+        then get_class_constructor(class_or_instance)
+        else create_clone_constructor(class_or_instance)
+    
+    if properties then
+        return constructor(properties)
+    end
+
+    return constructor
+end
+
+
 
 return create :: Create

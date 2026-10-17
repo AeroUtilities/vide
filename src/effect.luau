@@ -1,7 +1,16 @@
+--* [[----------< modules >----------]]
+
 local graph = require "./graph"
+
+
+--* [[----------< graph >----------]]
+
 local create_node = graph.create_node
 local assert_stable_scope = graph.assert_stable_scope
 local evaluate_node = graph.evaluate_node
+
+
+--* [[----------< effect >----------]]
 
 local function effect<T>(callback: (T) -> T, initial_value: T)
     local node = create_node(assert_stable_scope(), callback, initial_value)
