@@ -1,30 +1,46 @@
+--* [[----------< modules >----------]]
+
 local flags = require "./flags"
 local branch = require "./branch"
 local source = require "./source"
 local effect = require "./effect"
-local timeout = require "./timeout" ()
+local timeout = require "./timeout"()
+
+
+--* [[----------< types >----------]]
 
 type Array<T> = { T }
 type Map<K, V> = { [K]: V }
-type Source<T> = () -> T
+type Source<T> = source.Source<T>
+
+type TimeoutHandle = {
+    cancel: boolean,
+}
+
+-- keyed by value (not index); each distinct value gets one scope
+type ValueScope<K, Obj> = {
+    destroy: () -> (),
+    object: Obj,
+    index: K?,
+    index_source: Source<K>,
+    count: number,
+    delay: number,
+    present: Source<boolean>,
+    timeout: TimeoutHandle?,
+}
+
+
+--* [[----------< values >----------]]
 
 local function values<K, V, Obj>(
     input: Source<Map<K, V>>,
     component: (V, Source<K>, Source<boolean>) -> (Obj, ...number)
 ): Source<Array<Obj>>
     local update_count = 0
-    local scopes = {} :: Map<V, {
-        destroy: () -> (),
-        object: Obj,
-        index: K?,
-        index_source: (K?) -> K,
-        count: number,
-        delay: number,
-        present: (boolean?) -> boolean,
-        timeout: { cancel: boolean }?,
-    }>
+    local scopes: Map<V, ValueScope<K, Obj>> = {}
 
-    local output = source({} :: Array<Obj>)
+    local output: Source<Array<Obj>> = source({} :: Array<Obj>)
+
     local function update_output()
         local objects = table.create(4)
 
@@ -41,15 +57,15 @@ local function values<K, V, Obj>(
         local count = update_count
         update_count += 1
 
-        local children_need_update = false -- set to true if a scope is created or destroyed
+        local children_need_update = false -- true if a scope is created or destroyed
 
-        if flags.strict then -- check for duplicate values
-            local map = {}
+        if flags.strict then
+            local seen = {}
             for _, v in data do
-                if map[v] then
+                if seen[v] then
                     error("table source passed to `values()` contains duplicate values", 0)
                 end
-                map[v] = true
+                seen[v] = true
             end
         end
 
@@ -57,7 +73,7 @@ local function values<K, V, Obj>(
         for i, v in data do
             local scope = scopes[v]
 
-            if scope == nil then -- create new scope and create component
+            if scope == nil then
                 local index_source = source(i)
                 local present = source(false)
 
@@ -69,7 +85,7 @@ local function values<K, V, Obj>(
                 end)
 
                 present(true)
-                
+
                 children_need_update = true
 
                 scopes[v] = {
@@ -82,25 +98,25 @@ local function values<K, V, Obj>(
                     present = present,
                     timeout = nil,
                 }
-            else -- update scope
+            else
                 scope.count = count
 
                 if scope.index ~= i then
-                    if scope.timeout then -- value is in input table again; cancel destruction
+                    if scope.timeout then -- value is back in the input; cancel destruction
                         scope.timeout.cancel = true
                         scope.timeout = nil
                         scope.present(true)
                     end
-                    
+
                     scope.index = i
                     scope.index_source(i)
                 end
             end
         end
 
-        -- destroy scopes
+        -- destroy scopes whose values left the input table
         for v, scope in scopes do
-            if scope.count < count then -- if count is not latest then value is no longer in the input table
+            if scope.count < count then
                 scope.present(false)
 
                 if scope.delay == 0 then
@@ -108,7 +124,7 @@ local function values<K, V, Obj>(
                     scopes[v] = nil
                     children_need_update = true
                 else
-                    scope.index = nil -- set to nil for the `scope.index ~= i` check
+                    scope.index = nil -- so a later reappear hits the `scope.index ~= i` path
                     if scope.timeout == nil then
                         scope.timeout = timeout(scope.delay, function() -- todo: possible redundant updates
                             scope.destroy()

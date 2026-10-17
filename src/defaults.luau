@@ -1,5 +1,16 @@
-local Enum = Enum or require "../test/mock".Enum :: never
-local Color3 = Color3 or require "../test/mock".Color3 :: never
+--* [[----------< global guards >----------]]
+
+local Enum = if Enum then Enum else require "../test/mock".Enum :: never
+local Color3 = if Color3 then Color3 else require "../test/mock".Color3 :: never
+
+
+--* [[----------< types >----------]]
+
+type Defaults = {
+    read [string]: { [string]: unknown }
+}
+
+--* [[----------< defaults >----------]]
 
 return {
     Part = {
@@ -110,4 +121,4 @@ return {
         BorderColor3 = Color3.new(0, 0, 0),
         BorderSizePixel = 0
     }
-} :: { [string]: { [string]: unknown} }
+} :: Defaults

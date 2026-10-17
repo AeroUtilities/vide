@@ -1,68 +1,94 @@
+--* [[----------< modules >----------]]
+
 local graph = require "./graph"
-type Node<T> = graph.Node<T>
+
+
+--* [[----------< graph >----------]]
+
 local create_node = graph.create_node
 local assert_stable_scope = graph.assert_stable_scope
 local get_scope = graph.get_scope
 local evaluate_node = graph.evaluate_node
 local push_cleanup = graph.push_cleanup
 
-local function update_property_effect(p: {
+
+--* [[----------< types >----------]]
+
+-- children sources may return an instance, nested lists, or another children source
+type Children = Instance | { Children } | (() -> Children)
+
+type ChildrenCache = {
+    instance: Instance,
+    cur_children_set: { [Instance]: true },
+    new_children_set: { [Instance]: true },
+    source: () -> Children,
+}
+
+type PropertyCache = {
     instance: Instance,
     property: string,
-    source: () -> unknown  
-})
+    source: () -> unknown,
+}
+
+type ParentCache = {
+    instance: Instance,
+    source: () -> Instance,
+}
+
+
+--* [[----------< effects >----------]]
+
+local function update_property_effect(p: PropertyCache): PropertyCache
     (p.instance :: any)[p.property] = p.source()
     return p
 end
 
-local function update_parent_effect(p: {
-    instance: Instance,
-    source: () -> Instance
-})
+local function update_parent_effect(p: ParentCache): ParentCache
     p.instance.Parent = p.source()
     return p
 end
 
 -- todo: investigate if "count" method used in indexes() and values() can improve performance here
-local function update_children_effect(p: {
-    instance: Instance,
-    cur_children_set: { [Instance]: true },
-    new_children_set: { [Instance]: true },
-    source: () -> Instance | { Instance }
-})
-    local cur_children_set: { [Instance]: true } = p.cur_children_set -- cache of all children parented before update
-    local new_children_set: { [Instance]: true } = p.new_children_set -- cache of all children parented after update
+local function update_children_effect(p: ChildrenCache): ChildrenCache
+    local cur_children_set = p.cur_children_set -- children parented before this update
+    local new_children_set = p.new_children_set -- children that should remain after this update
 
-    local new_children = p.source() -- all (and only) children that should be parented after this update
-    
-    local function process_child(child: Instance | { Instance })
+    local new_children = p.source()
+
+    local function process_child(child: Children)
         if type(child) == "userdata" then
-            if new_children_set[child] then return end -- stops redundant reparenting
+            local instance = child :: Instance
+            if new_children_set[instance] then
+                return -- already recorded this update
+            end
 
-            new_children_set[child] = true -- record child set from this update
-            
-            if not cur_children_set[child] then
-                child.Parent = p.instance -- if child wasn't already parented then parent it
-            else 
-                cur_children_set[child] = nil -- remove child from cache if it was already in cache
-            end  
+            new_children_set[instance] = true
+
+            if not cur_children_set[instance] then
+                instance.Parent = p.instance
+            else
+                cur_children_set[instance] = nil -- still present; keep parented
+            end
         elseif type(child) == "table" then
-            for _, child in child do
-                process_child(child)
+            for _, sub in child do
+                process_child(sub)
             end
         elseif type(child) == "function" then
-            local node = create_node(assert(get_scope()), update_children_effect, {
+            local cache: ChildrenCache = {
                 instance = p.instance,
                 cur_children_set = {},
                 new_children_set = {},
-                source = child   
-            })
-    
+                source = child,
+            }
+
+            local scope = assert(get_scope())
+            local node = create_node(scope, update_children_effect, cache)
+
             evaluate_node(node)
 
-            push_cleanup(assert(get_scope()), function()
-                for child in node.cache.cur_children_set do
-                    child.Parent = nil
+            push_cleanup(scope, function()
+                for nested in node.cache.cur_children_set do
+                    nested.Parent = nil
                 end
             end)
         end
@@ -71,7 +97,7 @@ local function update_children_effect(p: {
     process_child(new_children)
 
     for child in cur_children_set do
-        child.Parent = nil -- unparent all children that weren't in the new children set
+        child.Parent = nil -- no longer in the new set
     end
 
     table.clear(cur_children_set) -- clear cache, preserve capacity
@@ -80,46 +106,56 @@ local function update_children_effect(p: {
     return p
 end
 
+
+--* [[----------< api >----------]]
+
+local function property(instance: Instance, property_name: string, source: () -> unknown)
+    local node = create_node(assert_stable_scope(), update_property_effect, {
+        instance = instance,
+        property = property_name,
+        source = source,
+    })
+
+    evaluate_node(node)
+
+    return node
+end
+
+local function parent(instance: Instance, source: () -> Instance)
+    local node = create_node(assert_stable_scope(), update_parent_effect, {
+        instance = instance,
+        source = source,
+    })
+
+    evaluate_node(node)
+
+    return node
+end
+
+local function children(instance: Instance, source: () -> Children)
+    local scope = assert_stable_scope()
+    local cache: ChildrenCache = {
+        instance = instance,
+        cur_children_set = {},
+        new_children_set = {},
+        source = source,
+    }
+
+    local node = create_node(scope, update_children_effect, cache)
+
+    evaluate_node(node)
+
+    push_cleanup(scope, function()
+        for child in node.cache.cur_children_set do
+            child.Parent = nil
+        end
+    end)
+
+    return node
+end
+
 return {
-    property = function(instance, property, source)
-        local node = create_node(assert_stable_scope(), update_property_effect, {
-            instance = instance,
-            property = property,
-            source = source
-        })
-
-        evaluate_node(node)
-
-        return node
-    end,
-
-    parent = function(instance, parent)
-        local node = create_node(assert_stable_scope(), update_parent_effect, {
-            instance = instance,
-            source = parent
-        })
-
-        evaluate_node(node)
-        
-        return node
-    end,
-
-    children = function(instance, children)
-        local node = create_node(assert_stable_scope(), update_children_effect, {
-            instance = instance,
-            cur_children_set = {},
-            new_children_set = {},
-            source = children
-        })
-
-        evaluate_node(node)
-
-        push_cleanup(assert_stable_scope(), function()
-            for child in node.cache.cur_children_set do
-                child.Parent = nil
-            end
-        end)
-
-        return node
-    end
+    property = property,
+    parent = parent,
+    children = children,
 }

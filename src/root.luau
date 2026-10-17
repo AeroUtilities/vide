@@ -1,26 +1,51 @@
+--* [[----------< modules >----------]]
+
 local graph = require "./graph"
-type Node<T> = graph.Node<T>
+
+
+--* [[----------< types >----------]]
+
+type Destroy = () -> ()
+type Traceback = (string?) -> string
+type RootFn<T...> = (destroy: Destroy) -> T...
+type Root = <T...>(fn: RootFn<T...>) -> (Destroy, T...)
+
+
+--* [[----------< graph >----------]]
+
 local create_node = graph.create_node
 local push_scope = graph.push_scope
 local pop_scope = graph.pop_scope
-local destroy = graph.destroy
+local destroy_node = graph.destroy
 
-local refs = {}
 
-local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
+--* [[----------< state >----------]]
+
+-- strong refs so root nodes are not collected while alive
+local refs: { [graph.Node<any>]: true } = {}
+
+
+--* [[----------< root >----------]]
+
+-- creates a stable root scope; returns a destroyer plus any values returned by fn
+local function root<T...>(fn: RootFn<T...>): (Destroy, T...)
     local node = create_node(false, false, false)
+    local traceback = debug.traceback :: Traceback
 
-    refs[node] = true -- prevent gc of root node
+    refs[node] = true
 
-    local destroy = function()
-        if not refs[node] then error "root already destroyed" end
+    local function destroy()
+        if not refs[node] then
+            error("root already destroyed", 0)
+        end
+
         refs[node] = nil
-        destroy(node)
+        destroy_node(node)
     end
 
     push_scope(node)
 
-    local result = { xpcall(fn, debug.traceback, destroy) }
+    local result = { xpcall(fn, traceback, destroy) }
 
     pop_scope()
 
@@ -32,4 +57,4 @@ local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
     return destroy, unpack(result :: any, 2)
 end
 
-return root :: <T...>(fn: (destroy: () -> ()) -> T...) -> (() -> (), T...)
+return root :: Root

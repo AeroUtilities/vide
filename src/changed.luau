@@ -1,17 +1,28 @@
+--* [[----------< modules >----------]]
+
 local action = require "./action"()
 local cleanup = require "./cleanup"
 
-local function changed<T>(property: string, callback: (T) -> ())
+
+--* [[----------< types >----------]]
+
+type ChangedCallback<T> = (T) -> ()
+
+
+--* [[----------< changed >----------]]
+
+local function changed<T>(property: string, callback: ChangedCallback<T>)
     return action(function(instance)
-        local con = instance:GetPropertyChangedSignal(property):Connect(function()
-            callback((instance :: any)[property])
+        local target = instance :: any
+        local connection = instance:GetPropertyChangedSignal(property):Connect(function()
+            callback(target[property])
         end)
 
         cleanup(function()
-            con:Disconnect()
+            connection:Disconnect()
         end)
 
-        callback((instance :: any)[property])
+        callback(target[property])
     end)
 end
 
