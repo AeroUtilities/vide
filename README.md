@@ -4,6 +4,14 @@
     <img src="docs/public/full_logo.svg" width="600" />
 </div>
 
+> [!NOTE]
+> This is a personal fork of [centau/vide](https://github.com/centau/vide), based on
+> v0.4.1. The source has been cleaned up for readability (sectioned modules, named
+> types) and fixed for the new Luau type solver. Behavior is intended to match upstream.
+>
+> This branch may change or be rebased as upstream Vide updates. For the official
+> release, use [centau/vide](https://github.com/centau/vide).
+
 Vide is a reactive Luau UI library inspired by [Solid](https://www.solidjs.com/).
 
 - Fully Luau typecheckable
