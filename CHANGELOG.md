@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `Children` type for anything accepted as a child: an instance, a list of
+  children, or a function returning a child or `nil`. Lets components return
+  `show()`, `switch()`, `indexes()` and `values()` results in a typed list, e.g.
+  `{ Vide.Children }`.
+
 ### Changed
 
 - Source modules reorganized into labelled sections with named types. No
