@@ -10,6 +10,7 @@ local root = require "./root"
 local mount = require "./mount"
 local create = require "./create"
 local apply = require "./apply"
+local implicit_effect = require "./implicit_effect"
 local source = require "./source"
 local effect = require "./effect"
 local derive = require "./derive"
@@ -37,6 +38,7 @@ export type Context<T> = context.Context<T>
 export type context<T> = Context<T>
 export type Instances = create.Instances
 export type Properties<T> = create.Properties<T>
+export type Children = implicit_effect.Children
 
 
 --* [[----------< runtime >----------]]

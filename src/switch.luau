@@ -12,8 +12,10 @@ type Array<T> = { T }
 type Map<K, V> = { [K]: V }
 type Source<T> = source.Source<T>
 
-type Present = Source<boolean>
-type Component<Obj> = (Present) -> (Obj, ...number)
+-- read-only view: users pass plain functions, derives or sources, and get one back
+type Getter<T> = () -> T
+
+type Component<Obj> = (Getter<boolean>) -> (Obj, ...number)
 
 type TimeoutHandle = {
     cancel: boolean,
@@ -23,22 +25,22 @@ type SwitchScope<Obj> = {
     destroy: () -> (),
     object: Obj,
     delay: number,
-    present: Present,
+    present: Source<boolean>,
     timeout: TimeoutHandle?,
 }
 
-type SwitchOutput<Obj> = Source<nil | Obj | Array<Obj>>
+type SwitchOutput<Obj> = Getter<nil | Obj | Array<Obj>>
 
 
 --* [[----------< switch >----------]]
 
 local function switch_map<K, Obj>(
-    input: Source<K>,
+    input: Getter<K>,
     map: Map<K, Component<Obj>>
 ): SwitchOutput<Obj>
     local scopes: Map<K, SwitchScope<Obj>> = {}
 
-    local output: SwitchOutput<Obj> = source(nil :: nil | Obj | Array<Obj>)
+    local output: Source<nil | Obj | Array<Obj>> = source(nil :: nil | Obj | Array<Obj>)
 
     local function update_output()
         local objects = {}
@@ -127,7 +129,7 @@ local function switch_map<K, Obj>(
     return output
 end
 
-local function switch<K, Obj>(input: Source<K>): (map: Map<K, Component<Obj>>) -> SwitchOutput<Obj>
+local function switch<K, Obj>(input: Getter<K>): (map: Map<K, Component<Obj>>) -> SwitchOutput<Obj>
     return function(map)
         return switch_map(input, map)
     end

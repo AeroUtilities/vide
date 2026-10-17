@@ -4,42 +4,41 @@ local source = require "./source"
 local derive = require "./derive"
 local effect = require "./effect"
 local switch = require "./switch"
-local read = require "./read"
 
 
 --* [[----------< types >----------]]
 
 type Array<T> = { T }
 type Map<K, V> = { [K]: V }
-type Source<T> = source.Source<T>
 
-type Present = Source<boolean>
-type Component<T, Obj> = (Source<T>, Present) -> (Obj, ...number)
-type Fallback<Obj> = (Present) -> (Obj, ...number)
-type ShowOutput<Obj> = Source<nil | Obj | Array<Obj>>
+-- read-only view: users pass plain functions, derives or sources, and get one back
+type Getter<T> = () -> T
+
+type Component<T, Obj> = (Getter<T>, Getter<boolean>) -> (Obj, ...number)
+type Fallback<Obj> = (Getter<boolean>) -> (Obj, ...number)
+type ShowOutput<Obj> = Getter<nil | Obj | Array<Obj>>
 
 
 --* [[----------< show >----------]]
 
 -- shows component when input is truthy; optional fallback when falsey
 local function show<T, Obj>(
-    input: Source<T?>,
+    input: Getter<T?>,
     component: Component<T, Obj>,
     fallback: Fallback<Obj>?
 ): ShowOutput<Obj>
     -- holds the last truthy value so the component still has data while present
-    local filtered_input = source()
+    local filtered_input: source.Source<T> = source()
 
     effect(function()
-        -- read() disambiguates Source get vs set under the new solver
-        local value = read(input)
+        local value = input()
         if value then
             filtered_input(value)
         end
     end)
 
     local input_is_truthy = derive(function()
-        return not not read(input)
+        return not not input()
     end)
 
     local cases: Map<boolean, Fallback<Obj>> = {
