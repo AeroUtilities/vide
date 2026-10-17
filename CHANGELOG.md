@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 --------------------------------------------------------------------------------
 
+## [Unreleased]
+
+### Changed
+
+- Source modules reorganized into labelled sections with named types. No
+  intended behavior change.
+- `test/spring-test.luau` is now a finite testkit suite instead of an infinite
+  terminal demo.
+
+### Fixed
+
+- New type solver errors in `indexes()`, `values()`, `switch()`, `show()`,
+  `read()`, implicit effects and the `vide` flag metatable.
+
+--------------------------------------------------------------------------------
+
 ## [0.4.1] - 2026-07-11
 
 ### Changed
