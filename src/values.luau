@@ -13,6 +13,9 @@ type Array<T> = { T }
 type Map<K, V> = { [K]: V }
 type Source<T> = source.Source<T>
 
+-- read-only view: users pass plain functions, derives or sources, and get one back
+type Getter<T> = () -> T
+
 type TimeoutHandle = {
     cancel: boolean,
 }
@@ -33,9 +36,9 @@ type ValueScope<K, Obj> = {
 --* [[----------< values >----------]]
 
 local function values<K, V, Obj>(
-    input: Source<Map<K, V>>,
-    component: (V, Source<K>, Source<boolean>) -> (Obj, ...number)
-): Source<Array<Obj>>
+    input: Getter<Map<K, V>>,
+    component: (V, Getter<K>, Getter<boolean>) -> (Obj, ...number)
+): Getter<Array<Obj>>
     local update_count = 0
     local scopes: Map<V, ValueScope<K, Obj>> = {}
 

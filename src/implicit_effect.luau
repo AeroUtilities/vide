@@ -14,14 +14,15 @@ local push_cleanup = graph.push_cleanup
 
 --* [[----------< types >----------]]
 
--- children sources may return an instance, nested lists, or another children source
-type Children = Instance | { Children } | (() -> Children)
+-- anything accepted as a child: an instance, a nested list, or a function returning either (nil = nothing)
+-- the list is read-only so arrays of narrower types (e.g. { Instance }) are accepted; mutable tables are invariant
+export type Children = Instance | { read [number]: Children } | (() -> Children?)
 
 type ChildrenCache = {
     instance: Instance,
     cur_children_set: { [Instance]: true },
     new_children_set: { [Instance]: true },
-    source: () -> Children,
+    source: () -> Children?,
 }
 
 type PropertyCache = {
@@ -55,7 +56,7 @@ local function update_children_effect(p: ChildrenCache): ChildrenCache
 
     local new_children = p.source()
 
-    local function process_child(child: Children)
+    local function process_child(child: Children?)
         if type(child) == "userdata" then
             local instance = child :: Instance
             if new_children_set[instance] then
@@ -132,7 +133,7 @@ local function parent(instance: Instance, source: () -> Instance)
     return node
 end
 
-local function children(instance: Instance, source: () -> Children)
+local function children(instance: Instance, source: () -> Children?)
     local scope = assert_stable_scope()
     local cache: ChildrenCache = {
         instance = instance,

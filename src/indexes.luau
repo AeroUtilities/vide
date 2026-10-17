@@ -12,6 +12,9 @@ type Array<T> = { T }
 type Map<K, V> = { [K]: V }
 type Source<T> = source.Source<T>
 
+-- read-only view: users pass plain functions, derives or sources, and get one back
+type Getter<T> = () -> T
+
 type TimeoutHandle = {
     cancel: boolean,
 }
@@ -31,9 +34,9 @@ type IndexScope<V, Obj> = {
 --* [[----------< indexes >----------]]
 
 local function indexes<K, V, Obj>(
-    input: Source<Map<K, V>>,
-    component: (Source<V>, K, Source<boolean>) -> (Obj, ...number)
-): Source<Array<Obj>>
+    input: Getter<Map<K, V>>,
+    component: (Getter<V>, K, Getter<boolean>) -> (Obj, ...number)
+): Getter<Array<Obj>>
     local update_count = 0
     local scopes: Map<K, IndexScope<V, Obj>> = {}
 

@@ -8,5 +8,6 @@ export type context<T> = vide.context<T>
 export type Context<T> = vide.Context<T>
 export type Instances = vide.Instances
 export type Properties<T> = vide.Properties<T>
+export type Children = vide.Children
 
 return vide
